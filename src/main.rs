@@ -10,6 +10,9 @@ use rocket::response::Redirect;
 use rocket_contrib::serve::StaticFiles;
 use rocket_contrib::json::{Json, JsonValue};
 use serde::{Serialize, Deserialize};
+use rand::{thread_rng, Rng};
+use rand::distributions::Alphanumeric;
+use url::Url;
 
 type DB = Mutex<HashMap<String, String>>;
 
@@ -28,6 +31,14 @@ pub struct Submission {
     url: String,
 }
 
+fn generate_slug() -> String {
+    let result = thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(5)
+        .collect();
+    result
+}
+
 #[post("/", format = "application/json", data = "<submission>")]
 fn shorten(submission: Json<Submission>, state: State<DB>) -> JsonValue {
     // Don't know why I can't destructure this, should be able to
@@ -35,13 +46,18 @@ fn shorten(submission: Json<Submission>, state: State<DB>) -> JsonValue {
     let mut db = state.lock().expect("Unable to lock");
     let slug = match &submission.slug {
         Some(s) => s.clone(),
-        None => "".to_string(), //TODO: Replace with slug generator.
+        None => generate_slug(), //TODO: Replace with slug generator.
+    };
+
+    let url = match Url::parse(&submission.url) {
+        Ok(u) => u.into_string(),
+        Err(e) => return json!({"status": "error", "reason": format!("Couldn't shorten, url is funky. ({})", e)}),
     };
 
     if db.contains_key(&slug) {
-        json!({"status": "error", "reason": "key exists"})
+        json!({"status": "error", "reason": "Couldn't shorten, url already points somewhere."})
     } else {
-        db.insert(slug.clone(), submission.url.clone());
+        db.insert(slug.clone(), url);
         json!({"status": "success", "slug": slug})
     }
 }
