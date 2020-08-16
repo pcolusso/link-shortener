@@ -32,7 +32,7 @@ pub struct Submission {
 }
 
 fn generate_slug() -> String {
-    let result = thread_rng()
+    let result: String = thread_rng()
         .sample_iter(&Alphanumeric)
         .take(5)
         .collect();
@@ -45,8 +45,11 @@ fn shorten(submission: Json<Submission>, state: State<DB>) -> JsonValue {
     // let Submission { slug: s, url: u } = submission;
     let mut db = state.lock().expect("Unable to lock");
     let slug = match &submission.slug {
-        Some(s) => s.clone(),
-        None => generate_slug(), //TODO: Replace with slug generator.
+        Some(s) => { match &s[..] {
+            "" => generate_slug(),
+            _ => s.clone(),
+        }},
+        None => generate_slug(),
     };
 
     let url = match Url::parse(&submission.url) {
